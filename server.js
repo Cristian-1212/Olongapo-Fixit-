@@ -3,7 +3,7 @@ const http=require('http'),fs=require('fs'),path=require('path'),zlib=require('z
 try{process.loadEnvFile(path.join(__dirname,'.env'))}catch(e){if(e.code!=='ENOENT')throw e}
 const {get}=require('./src/db'),{HE,bad,authUser,need,cookie,validateCSRFToken,errResp,okResp}=require('./src/security');
 const {getReport}=require('./src/reports'),{R}=require('./src/routes'),{seed}=require('./src/seed');
-seed();
+if (!process.env.VERCEL) { try { seed(); } catch (e) { console.error('seed failed', e); } }
 const AUTO_PORT=process.env.PORT===undefined,PORT=AUTO_PORT?3000:Number(process.env.PORT),PUB=path.join(__dirname,'public');
 const MIME={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.svg':'image/svg+xml','.ico':'image/x-icon','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.json':'application/json','.woff2':'font/woff2'};
 const IS_PROD=process.env.NODE_ENV==='production';
