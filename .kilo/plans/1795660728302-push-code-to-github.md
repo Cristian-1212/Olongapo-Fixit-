@@ -1,38 +1,38 @@
-# Plan: Push code to GitHub
+# Plan: Fix Vercel FUNCTION_INVOCATION_FAILED
 
 ## Goal
-Commit the current working tree and push it to the existing remote `origin` (`https://github.com/cjbulan27/Olongapo-fix-final-Version.git`) on branch `main`.
+Make the Node/Express Olongapo FixIt app deployable on Vercel without 500 errors on `/favicon.ico` or any route.
 
-## Current state
-- Branch: `main`, no commits yet (orphan branch).
-- Remote `origin` already configured.
-- Working tree contains staged `README.md` plus many untracked files (`src/`, `public/`, `server.js`, `package.json`, tests, etc.).
-- `.gitignore` present; `.env` (secrets) must NOT be committed.
+## Root causes
+1. `src/db.js` opens SQLite at `process.env.DB_FILE || path.join(__dirname,'..','fixit.db')` — the project directory is read-only on Vercel, causing a crash on cold start.
+2. `server.js` calls `seed()` at module load and exports an `http.Server` instance; Vercel's Node runtime expects a request-handler function, not a server object.
+3. No `vercel.json` routes all requests to the handler; static files may hit the function.
+4. No `public/favicon.ico`, so `/favicon.ico` returns 404 JSON or triggers function errors.
 
-## Constraints
-- Do not commit secrets: ensure `.env` is ignored and verify no `GEMINI_API_KEY` value is staged.
-- Commit identity may need to be set if `git config user.name`/`user.email` are unset.
-- Pushing requires network access and GitHub authentication (PAT/credential manager).
-
-## Steps
-1. Inspect `git status` and `.gitignore` to confirm `.env` is ignored.
-2. Search staged/untracked files for leaked secrets (`GEMINI_API_KEY=`, tokens).
-3. Stage all intended files: `git add -A` (or selectively), ensuring `.env` excluded.
-4. Set git identity if missing: `git config user.name` / `git config user.email`.
-5. Create initial commit: `git commit -m "Initial commit"`.
-6. Push: `git push -u origin main`.
-7. Verify: `git status`, `git log --oneline -1`, `git ls-remote origin`.
+## Changes
+1. `src/db.js`: use `process.env.DB_FILE || (process.env.VERCEL ? '/tmp/fixit.db' : path.join(__dirname,'..','fixit.db'))`.
+2. `server.js`: extract request handler into `handleRequest(req,res)`; export it as `module.exports = handleRequest`; only call `server.listen` when `require.main === module`. Keep `seed()` guarded with try/catch and skip on Vercel if needed (or run once; DB in /tmp persists per instance).
+3. Add `vercel.json` with `builds`/`routes` routing all paths to `server.js` (or create `api/index.js` wrapper). Prefer `vercel.json`:
+   ```json
+   {
+     "version": 2,
+     "builds": [{"src":"server.js","use":"@vercel/node"}],
+     "routes": [{"src":"/(.*)","dest":"/server.js"}]
+   }
+   ```
+4. Add a valid `public/favicon.ico` (small valid ICO). Also optionally `app/favicon.ico` not applicable (no Next.js).
+5. Ensure env vars documented in `.env.example` (GEMINI_API_KEY, etc.) and configured in Vercel dashboard.
 
 ## Validation
-- `git status` clean after push.
-- Remote shows new commit on `main`.
-- No `.env` or secret values in commit (`git show --stat` / grep).
+- `npm install`
+- `npm run build` (no build script; use `node --check server.js` and `node test.js`)
+- `node server.js` locally, request `/favicon.ico` returns 200.
+- `vercel dev` or deploy and check `/favicon.ico` and `/api/health`.
 
 ## Risks
-- Authentication failure: user must provide PAT or use credential manager.
-- Large `node_modules`/`package-lock` if not ignored — check `.gitignore` first.
-- Accidental secret commit: block push if any secret detected.
+- `/tmp` SQLite is ephemeral per instance; data not persistent across cold starts. For production, recommend external DB, but minimal fix uses /tmp.
+- `@xenova/transformers` may be heavy; Vercel function size limits. Could disable image verification via `IMAGE_VERIFY_DISABLED=1` in Vercel env.
 
 ## Open questions
-- Should all untracked files be committed, or only a subset? (Default: all except ignored.)
-- Commit message preference? (Default: "Initial commit".)
+- Should we keep demo seed on Vercel? (Recommended: skip seed in production to avoid repeated seeding; but DB in /tmp starts empty each cold start.)
+- Should static assets be served by Vercel CDN instead of function? (Recommended: keep simple; all routes to function.)

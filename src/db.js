@@ -1,7 +1,8 @@
 'use strict';
 const path=require('path');
 const {DatabaseSync}=require('node:sqlite');
-const db=new DatabaseSync(process.env.DB_FILE||path.join(__dirname,'..','fixit.db'));
+const dbFile=process.env.DB_FILE||(process.env.VERCEL?'/tmp/fixit.db':path.join(__dirname,'..','fixit.db'));
+const db=new DatabaseSync(dbFile);
 db.exec(`PRAGMA journal_mode=WAL;PRAGMA foreign_keys=ON;
 CREATE TABLE IF NOT EXISTS barangays(id INTEGER PRIMARY KEY,name TEXT UNIQUE NOT NULL,address TEXT,contact TEXT,lat REAL NOT NULL,lng REAL NOT NULL,active INTEGER DEFAULT 1,polygon TEXT);
 CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,name TEXT NOT NULL,email TEXT UNIQUE NOT NULL,pw TEXT NOT NULL,role TEXT NOT NULL CHECK(role IN('admin','brgy','res')),pos TEXT,brgy INTEGER REFERENCES barangays(id),phone TEXT,active INTEGER DEFAULT 1,created TEXT,age INTEGER,address TEXT,proof TEXT,vstatus TEXT DEFAULT 'approved',vrem TEXT,vat TEXT,ocr_text TEXT,ocr_address TEXT,ocr_status TEXT,ocr_confidence REAL,custom_gender TEXT,document_type TEXT,upload_mode TEXT,id_front TEXT,id_back TEXT,residency_document TEXT,ocr_name TEXT,ocr_dob TEXT,ocr_barangay TEXT,document_uploaded_at TEXT,ocr_document_number TEXT,ocr_expiration_date TEXT,ocr_issue_date TEXT,ocr_field_confidence TEXT,sex TEXT,civil_status TEXT);
