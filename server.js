@@ -3,7 +3,7 @@ const http=require('http'),fs=require('fs'),path=require('path'),zlib=require('z
 try{process.loadEnvFile(path.join(__dirname,'.env'))}catch(e){if(e.code!=='ENOENT')throw e}
 const {get}=require('./src/db'),{HE,bad,authUser,need,cookie,validateCSRFToken,errResp,okResp}=require('./src/security');
 const {getReport}=require('./src/reports'),{R}=require('./src/routes'),{seed}=require('./src/seed');
-if (!process.env.VERCEL) { try { seed(); } catch (e) { console.error('seed failed', e); } }
+seed();
 const AUTO_PORT=process.env.PORT===undefined,PORT=AUTO_PORT?3000:Number(process.env.PORT),PUB=path.join(__dirname,'public');
 const MIME={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.svg':'image/svg+xml','.ico':'image/x-icon','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.json':'application/json','.woff2':'font/woff2'};
 const IS_PROD=process.env.NODE_ENV==='production';
@@ -28,7 +28,6 @@ const {all,run}=require('./src/db');
 function runInactivityCheck(){try{const users=all("SELECT * FROM users WHERE role<>'admin' AND COALESCE(protected,0)=0");const now=new Date();for(const u of users){const la=u.last_activity||u.created||new Date().toISOString();const d=new Date(la);if(isNaN(d.getTime()))continue;const months=(now.getFullYear()-d.getFullYear())*12+(now.getMonth()-d.getMonth());const dayDiff=now.getDate()-d.getDate();const totalMonths=dayDiff<0?months-1:months;if(totalMonths>=6){run('DELETE FROM sessions WHERE uid=?',u.id);run('DELETE FROM notifs WHERE uid=?',u.id);run('DELETE FROM users WHERE id=?',u.id);console.log(JSON.stringify({ts:new Date().toISOString(),msg:'AUTO_DELETE_USER',id:u.id,name:u.name}))}else if(totalMonths>=3&&u.active){run('UPDATE users SET active=0 WHERE id=?',u.id);run('DELETE FROM sessions WHERE uid=?',u.id);console.log(JSON.stringify({ts:new Date().toISOString(),msg:'AUTO_DISABLE_USER',id:u.id,name:u.name}))}}}catch(e){console.error('inactivity check error',e)}}
 runInactivityCheck();setInterval(runInactivityCheck,24*60*60*1000);
 
-module.exports = handleRequest;
 if (require.main === module) {
   server.listen(listenPort, () => {
     log('SERVER STARTED', {

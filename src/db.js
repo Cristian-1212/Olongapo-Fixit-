@@ -1,7 +1,10 @@
 'use strict';
 const path=require('path');
 const {DatabaseSync}=require('node:sqlite');
-const dbFile=process.env.DB_FILE||(process.env.VERCEL?'/tmp/fixit.db':path.join(__dirname,'..','fixit.db'));
+const fs=require('fs');
+const dbFile=process.env.DB_FILE||path.join(__dirname,'..','fixit.db');
+const dbDir=path.dirname(dbFile);
+if (dbDir && !fs.existsSync(dbDir)) fs.mkdirSync(dbDir,{recursive:true});
 const db=new DatabaseSync(dbFile);
 db.exec(`PRAGMA journal_mode=WAL;PRAGMA foreign_keys=ON;
 CREATE TABLE IF NOT EXISTS barangays(id INTEGER PRIMARY KEY,name TEXT UNIQUE NOT NULL,address TEXT,contact TEXT,lat REAL NOT NULL,lng REAL NOT NULL,active INTEGER DEFAULT 1,polygon TEXT);
